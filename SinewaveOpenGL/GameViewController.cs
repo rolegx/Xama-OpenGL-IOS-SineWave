@@ -12,7 +12,20 @@ namespace SinewaveOpenGL
     [Register("GameViewController")]
     public class GameViewController : GLKViewController, IGLKViewDelegate
     {
+        enum Uniform
+        {
+            ModelViewProjection_Matrix,
+            Normal_Matrix,
+            Count
+        }
+        //
+        Matrix4 modelViewProjectionMatrix;
+        float rotation;
+
         #region DATA
+
+        int[] uniforms = new int[(int)Uniform.Count];
+
         float[] m_TriangleVertices = null;
         //{
         //    0.0f, 0.9f, 0.0f, // top
@@ -134,6 +147,7 @@ namespace SinewaveOpenGL
         }
         void SetupGL()
         {
+            rotation = 0;
             //
             // m_TriangleVertices = new float[] {
             // 0.0f, 0.9f, 0.0f, // top
@@ -187,15 +201,19 @@ namespace SinewaveOpenGL
             m_offsetSin += 0.01f;
 
             CreateSineWave();
+            //
             GL.BindBuffer(BufferTarget.ArrayBuffer, m_vertexBuffer);
             GL.BufferData(BufferTarget.ArrayBuffer, (IntPtr)( m_TriangleVertices.Length * sizeof(float)), m_TriangleVertices, BufferUsage.DynamicDraw);
             GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-            //var aspect = (float)Math.Abs (View.Bounds.Size.Width / View.Bounds.Size.Height);
-            //var projectionMatrix = Matrix4.CreatePerspectiveFieldOfView (MathHelper.DegreesToRadians (65.0f), aspect, 0.1f, 100.0f);
+            //
+            // dO THE  rotation
+            //
+            var aspect = (float)Math.Abs (View.Bounds.Size.Width / View.Bounds.Size.Height);
+            var projectionMatrix = Matrix4.CreatePerspectiveFieldOfView (MathHelper.DegreesToRadians (65.0f), aspect, 0.1f, 100.0f);
 
 
-            //var baseModelViewMatrix = Matrix4.CreateTranslation (0.0f, 0.0f, -4.0f);
-            //baseModelViewMatrix = Matrix4.CreateFromAxisAngle (new Vector3 (0.0f, 1.0f, 0.0f), rotation) * baseModelViewMatrix;
+            var baseModelViewMatrix = Matrix4.CreateTranslation (0.0f, 0.0f, -4.0f);
+            baseModelViewMatrix = Matrix4.CreateFromAxisAngle (new Vector3 (0.0f, 1.0f, 0.0f), rotation) * baseModelViewMatrix;
 
             //// Compute the model view matrix for the object rendered with GLKit
             //var modelViewMatrix = Matrix4.CreateTranslation (0.0f, 0.0f, -1.5f);
@@ -205,15 +223,14 @@ namespace SinewaveOpenGL
             //effect.Transform.ModelViewMatrix = modelViewMatrix;
 
             // Compute the model view matrix for the object rendered with ES2
-            //modelViewMatrix = Matrix4.CreateTranslation (0.0f, 0.0f, 1.5f);
-            //modelViewMatrix = Matrix4.CreateFromAxisAngle (new Vector3 (1.0f, 1.0f, 1.0f), rotation) * modelViewMatrix;
-            //modelViewMatrix = modelViewMatrix * baseModelViewMatrix;
+            var modelViewMatrix = Matrix4.CreateTranslation (0.0f, 0.0f, 1.5f);
+            modelViewMatrix = Matrix4.CreateFromAxisAngle (new Vector3 (1.0f, 1.0f, 1.0f), rotation) * modelViewMatrix;
+            modelViewMatrix = modelViewMatrix * baseModelViewMatrix;
 
             //normalMatrix = new Matrix3 (Matrix4.Transpose (Matrix4.Invert (modelViewMatrix)));
 
-            //modelViewProjectionMatrix = modelViewMatrix * projectionMatrix;
-
-            //rotation += (float)TimeSinceLastUpdate * 0.5f;
+            modelViewProjectionMatrix = modelViewMatrix * projectionMatrix; 
+            rotation += (float)TimeSinceLastUpdate * 0.5f;
         }
 
         void IGLKViewDelegate.DrawInRect(GLKView view, CoreGraphics.CGRect rect)
@@ -224,6 +241,9 @@ namespace SinewaveOpenGL
             GL.Oes.BindVertexArray(m_vaoObject);
             //
             GL.UseProgram(m_shaderProgram);
+            //
+            GL.UniformMatrix4(uniforms[(int)Uniform.ModelViewProjection_Matrix], false, ref modelViewProjectionMatrix);
+
             //
             GL.DrawArrays(BeginMode.LineStrip, 0, m_TriangleVertices.Length);
             GL.Oes.BindVertexArray(0);
@@ -257,8 +277,8 @@ namespace SinewaveOpenGL
 
             // Bind attribute locations.
             // This needs to be done prior to linking.
-            GL.BindAttribLocation(m_shaderProgram, (int)GLKVertexAttrib.Position, "position");
-            GL.BindAttribLocation(m_shaderProgram, (int)GLKVertexAttrib.Normal, "normal");
+            GL.BindAttribLocation(m_shaderProgram, (int)GLKVertexAttrib.Position, "vPosition");
+            //GL.BindAttribLocation(m_shaderProgram, (int)GLKVertexAttrib.Normal, "normal");
 
             // Link program.
             if (!LinkProgram(m_shaderProgram))
@@ -280,7 +300,7 @@ namespace SinewaveOpenGL
             }
 
             // Get uniform locations.
-            //uniforms [(int)Uniform.ModelViewProjection_Matrix] = GL.GetUniformLocation (m_shaderProgram, "modelViewProjectionMatrix");
+            uniforms [(int)Uniform.ModelViewProjection_Matrix] = GL.GetUniformLocation (m_shaderProgram, "modelViewProjectionMatrix");
             //uniforms [(int)Uniform.Normal_Matrix] = GL.GetUniformLocation (m_shaderProgram, "normalMatrix");
 
             // Release vertex and fragment shaders.
